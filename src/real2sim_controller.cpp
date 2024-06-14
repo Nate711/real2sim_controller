@@ -13,10 +13,7 @@
 #include "rclcpp/qos.hpp"
 
 namespace real2sim_controller {
-Real2SimController::Real2SimController()
-    : controller_interface::ControllerInterface(),
-      rt_command_ptr_(nullptr),
-      cmd_subscriber_(nullptr) {}
+Real2SimController::Real2SimController() : controller_interface::ControllerInterface() {}
 
 controller_interface::CallbackReturn Real2SimController::on_init() {
   try {
@@ -50,8 +47,6 @@ controller_interface::InterfaceConfiguration Real2SimController::state_interface
 
 controller_interface::CallbackReturn Real2SimController::on_activate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
-  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
-
   // Populate the command interfaces map
   for (auto &command_interface : command_interfaces_) {
     command_interfaces_map_[command_interface.get_prefix_name()].emplace(
@@ -72,22 +67,12 @@ controller_interface::CallbackReturn Real2SimController::on_activate(
 
   init_time_ = get_node()->now();
 
-  cmd_x_vel_ = 0.0;
-  cmd_y_vel_ = 0.0;
-  cmd_yaw_vel_ = 0.0;
-
-  // Initialize the command subscriber
-  cmd_subscriber_ = get_node()->create_subscription<CmdType>(
-      "/cmd_vel", rclcpp::SystemDefaultsQoS(),
-      [this](const CmdType::SharedPtr msg) { rt_command_ptr_.writeFromNonRT(msg); });
-
   RCLCPP_INFO(get_node()->get_logger(), "activate successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
 controller_interface::CallbackReturn Real2SimController::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
-  rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
   for (auto &command_interface : command_interfaces_) {
     command_interface.set_value(0.0);
   }
@@ -134,21 +119,19 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
     return controller_interface::return_type::OK;
   }
 
-  // Get the latest commanded velocities
-  auto command = rt_command_ptr_.readFromRT();
-  if (command && command->get()) {
-    cmd_x_vel_ = command->get()->linear.x;
-    cmd_y_vel_ = command->get()->linear.y;
-    cmd_yaw_vel_ = command->get()->angular.z;
-  }
+  params_ = param_listener_->get_params();
+  double freq = params_.test_frequency;
+  double amp = params_.test_amplitude;
+  int motor_idx = params_.test_motor_index;
 
   // Process the actions
   std::array<float, ACTION_SIZE> policy_output = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  phase_ += freq * 2 * M_PI * period.seconds();
+  policy_output.at(2) = std::sin(phase_) * amp;
 
-  double freq = 1.0;
-  double amp = 1.0;
-  policy_output.at(2) = std::sin(time_since_fade_in * freq * M_PI) * amp;
+  std::cout << "time: " << time_since_fade_in << " phase: " << phase_ << " amp: " << amp
+            << " freq: " << freq << " pos_com: " << policy_output.at(2) << "\n";
 
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action
@@ -156,16 +139,17 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
                                     (float)-params_.action_limit);
     // Scale and de-normalize to get the action vector
     if (params_.action_types[i] == "position") {
-      action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i] +
-                   params_.default_joint_pos[i];
+      action_.at(i) = fade_in_multiplier * action_clipped * params_.action_scales[i] +
+                      params_.default_joint_pos[i];
     } else {
-      action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i];
+      action_.at(i) = fade_in_multiplier * action_clipped * params_.action_scales[i];
     }
+
     // Send the action to the hardware interface
     command_interfaces_map_.at(params_.joint_names[i])
         .at(params_.action_types[i])
         .get()
-        .set_value((double)action_[i]);
+        .set_value((double)action_.at(i));
     command_interfaces_map_.at(params_.joint_names[i]).at("kp").get().set_value(params_.kps[i]);
     command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
   }

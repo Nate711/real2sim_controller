@@ -14,6 +14,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.h"
 #include "realtime_tools/realtime_publisher.h"
+#include "std_msgs/msg/float64.hpp"
 #include "tf2/LinearMath/Matrix3x3.h"
 #include "tf2/LinearMath/Quaternion.h"
 
@@ -22,6 +23,7 @@
 
 namespace real2sim_controller {
 using CmdType = geometry_msgs::msg::Twist;
+using Float64 = std_msgs::msg::Float64;
 
 class Real2SimController : public controller_interface::ControllerInterface {
  public:
@@ -56,9 +58,7 @@ class Real2SimController : public controller_interface::ControllerInterface {
   std::shared_ptr<ParamListener> param_listener_;
   Params params_;
 
-  float cmd_x_vel_ = 0;
-  float cmd_y_vel_ = 0;
-  float cmd_yaw_vel_ = 0;
+  double phase_ = 0.0;
 
   // Map from joint names to command types to command interfaces
   std::map<
@@ -70,9 +70,6 @@ class Real2SimController : public controller_interface::ControllerInterface {
   std::map<std::string,
            std::map<std::string, std::reference_wrapper<hardware_interface::LoanedStateInterface>>>
       state_interfaces_map_;
-
-  realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>> rt_command_ptr_;
-  rclcpp::Subscription<CmdType>::SharedPtr cmd_subscriber_;
 
   rclcpp::Time init_time_;
 

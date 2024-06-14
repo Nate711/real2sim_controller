@@ -82,3 +82,24 @@ real2sim_controller:
       default_value: 1.0,
       description: "Maximum action value before scaling",
     }
+
+  test_frequency:
+    {
+      type: double,
+      default_value: 1.0,
+      description: "Frequency of test motion in Hz",
+    }
+
+  test_amplitude:
+    {
+      type: double,
+      default_value: 0.0,
+      description: "Amplitude of test motion in radians",
+    }
+
+  test_motor_index:
+    {
+      type: int,
+      default_value: 2,
+      description: "Index of motor to use for test",
+    }

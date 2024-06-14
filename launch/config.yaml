@@ -10,8 +10,6 @@ controller_manager:
 
 real2sim_controller:
   ros__parameters:
-    repeat_action: 10
-
     joint_names:
       [
         "leg_front_r_1",
@@ -58,11 +56,10 @@ real2sim_controller:
         "position",
         "position",
       ]
-    action_scales: [0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3]
+
+    action_scales: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
     action_limit: 1.5
-
-    max_body_angle: 1.5
 
 teleop_twist_joy_node:
   ros__parameters:
