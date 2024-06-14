@@ -1,4 +1,3 @@
-
 from launch import LaunchDescription
 from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnProcessExit
@@ -25,12 +24,15 @@ def generate_launch_description():
     )
     robot_description = {"robot_description": robot_description_content}
 
-    robot_controllers = ParameterFile(PathJoinSubstitution(
-        [
-            FindPackageShare("neural_controller"),
-            "launch",
-            "config.yaml",
-        ]), allow_substs=True
+    robot_controllers = ParameterFile(
+        PathJoinSubstitution(
+            [
+                FindPackageShare("real2sim_controller"),
+                "launch",
+                "config.yaml",
+            ]
+        ),
+        allow_substs=True,
     )
 
     joy_node = Node(
@@ -57,13 +59,25 @@ def generate_launch_description():
     robot_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["neural_controller", "--controller-manager", "/controller_manager", "--controller-manager-timeout", "30"],
+        arguments=[
+            "real2sim_controller",
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            "30",
+        ],
     )
 
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager", "--controller-manager-timeout", "30"],
+        arguments=[
+            "joint_state_broadcaster",
+            "--controller-manager",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            "30",
+        ],
     )
 
     nodes = [
@@ -71,7 +85,7 @@ def generate_launch_description():
         robot_controller_spawner,
         joint_state_broadcaster_spawner,
         joy_node,
-        teleop_twist_joy_node
+        teleop_twist_joy_node,
     ]
 
     return LaunchDescription(nodes)

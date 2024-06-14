@@ -1,4 +1,4 @@
-# neural_controller
+# real2sim_controller
 This repository aims to ease the deployment of neural network control policies on robot hardware. It runs within the [ros2_control](https://github.com/ros-controls/ros2_control) framework and adopts [RTNeural](https://github.com/jatinchowdhury18/RTNeural) for real-time inference.
 
 ## Motivation
@@ -6,8 +6,7 @@ Getting a policy up and running on real hardware can be surprisingly tricky. Man
 Furthermore, common neural network libraries such as Torch are not designed to run in a real-time control loop, introducing latency/jitter that increases the difficulty of sim-to-real transfer. 
 
 # Install
-`git clone git@github.com:G-Levine/neural_controller.git --recurse-submodules` \
-(Submodules must be recursively cloned)
+`git clone git@github.com:Nate711/real2sim_controller.git`
 
 # Functionality
 ## Inputs

@@ -2,13 +2,13 @@ controller_manager:
   ros__parameters:
     update_rate: 500 # Hz
 
-    neural_controller:
-      type: neural_controller/NeuralController
+    real2sim_controller:
+      type: real2sim_controller/Real2SimController
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-neural_controller:
+real2sim_controller:
   ros__parameters:
     repeat_action: 10
 
@@ -29,7 +29,9 @@ neural_controller:
       ]
 
     default_joint_pos:
-      [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
+      # [0.26, 0.0, -0.52, -0.26, 0.0, 0.52, 0.26, 0.0, -0.52, -0.26, 0.0, 0.52]
+      # [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      [0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0]
     kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
     kds:
       [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
@@ -61,8 +63,6 @@ neural_controller:
     action_limit: 1.5
 
     max_body_angle: 1.5
-
-    model_path: "$(find-pkg-share neural_controller)/launch/policy.json"
 
 teleop_twist_joy_node:
   ros__parameters:

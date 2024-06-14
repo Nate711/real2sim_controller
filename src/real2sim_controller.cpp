@@ -1,6 +1,7 @@
-#include "neural_controller/neural_controller.hpp"
+#include "real2sim_controller/real2sim_controller.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <utility>
@@ -11,19 +12,16 @@
 #include "rclcpp/logging.hpp"
 #include "rclcpp/qos.hpp"
 
-namespace neural_controller {
-NeuralController::NeuralController()
+namespace real2sim_controller {
+Real2SimController::Real2SimController()
     : controller_interface::ControllerInterface(),
       rt_command_ptr_(nullptr),
       cmd_subscriber_(nullptr) {}
 
-controller_interface::CallbackReturn NeuralController::on_init() {
+controller_interface::CallbackReturn Real2SimController::on_init() {
   try {
     param_listener_ = std::make_shared<ParamListener>(get_node());
     params_ = param_listener_->get_params();
-
-    std::ifstream json_stream(params_.model_path, std::ifstream::binary);
-    model_ = RTNeural::json_parser::parseJson<float>(json_stream, true);
   } catch (const std::exception &e) {
     fprintf(stderr, "Exception thrown during init stage with message: %s \n", e.what());
     return controller_interface::CallbackReturn::ERROR;
@@ -32,25 +30,25 @@ controller_interface::CallbackReturn NeuralController::on_init() {
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn NeuralController::on_configure(
+controller_interface::CallbackReturn Real2SimController::on_configure(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   RCLCPP_INFO(get_node()->get_logger(), "configure successful");
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::InterfaceConfiguration NeuralController::command_interface_configuration()
+controller_interface::InterfaceConfiguration Real2SimController::command_interface_configuration()
     const {
   return controller_interface::InterfaceConfiguration{
       controller_interface::interface_configuration_type::ALL};
 }
 
-controller_interface::InterfaceConfiguration NeuralController::state_interface_configuration()
+controller_interface::InterfaceConfiguration Real2SimController::state_interface_configuration()
     const {
   return controller_interface::InterfaceConfiguration{
       controller_interface::interface_configuration_type::ALL};
 }
 
-controller_interface::CallbackReturn NeuralController::on_activate(
+controller_interface::CallbackReturn Real2SimController::on_activate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
 
@@ -73,16 +71,10 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   }
 
   init_time_ = get_node()->now();
-  repeat_action_counter_ = -1;
 
   cmd_x_vel_ = 0.0;
   cmd_y_vel_ = 0.0;
   cmd_yaw_vel_ = 0.0;
-
-  // Set the gravity z-component in the initial observation vector
-  for (int i = 0; i < OBSERVATION_HISTORY; i++) {
-    observation_[i * SINGLE_OBSERVATION_SIZE + 5] = -1.0;
-  }
 
   // Initialize the command subscriber
   cmd_subscriber_ = get_node()->create_subscription<CmdType>(
@@ -93,7 +85,7 @@ controller_interface::CallbackReturn NeuralController::on_activate(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::CallbackReturn NeuralController::on_deactivate(
+controller_interface::CallbackReturn Real2SimController::on_deactivate(
     const rclcpp_lifecycle::State & /*previous_state*/) {
   rt_command_ptr_ = realtime_tools::RealtimeBuffer<std::shared_ptr<CmdType>>(nullptr);
   for (auto &command_interface : command_interfaces_) {
@@ -103,8 +95,8 @@ controller_interface::CallbackReturn NeuralController::on_deactivate(
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
-controller_interface::return_type NeuralController::update(const rclcpp::Time &time,
-                                                           const rclcpp::Duration &period) {
+controller_interface::return_type Real2SimController::update(const rclcpp::Time &time,
+                                                             const rclcpp::Duration &period) {
   // When started, return to the default joint positions
   double time_since_init = (time - init_time_).seconds();
   if (time_since_init < params_.init_duration) {
@@ -142,13 +134,6 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     return controller_interface::return_type::OK;
   }
 
-  // Only get a new action from the policy when repeat_action_counter_ is 0
-  repeat_action_counter_ += 1;
-  repeat_action_counter_ %= params_.repeat_action;
-  if (repeat_action_counter_ != 0) {
-    return controller_interface::return_type::OK;
-  }
-
   // Get the latest commanded velocities
   auto command = rt_command_ptr_.readFromRT();
   if (command && command->get()) {
@@ -157,96 +142,18 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     cmd_yaw_vel_ = command->get()->angular.z;
   }
 
-  // Get the latest observation
-  double ang_vel_x, ang_vel_y, ang_vel_z, orientation_w, orientation_x, orientation_y,
-      orientation_z;
-  try {
-    // read IMU states from hardware interface
-    ang_vel_x = state_interfaces_map_.at(params_.imu_sensor_name)
-                    .at("angular_velocity.x")
-                    .get()
-                    .get_value();
-    ang_vel_y = state_interfaces_map_.at(params_.imu_sensor_name)
-                    .at("angular_velocity.y")
-                    .get()
-                    .get_value();
-    ang_vel_z = state_interfaces_map_.at(params_.imu_sensor_name)
-                    .at("angular_velocity.z")
-                    .get()
-                    .get_value();
-    orientation_w =
-        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.w").get().get_value();
-    orientation_x =
-        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.x").get().get_value();
-    orientation_y =
-        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.y").get().get_value();
-    orientation_z =
-        state_interfaces_map_.at(params_.imu_sensor_name).at("orientation.z").get().get_value();
-
-    // Calculate the projected gravity vector
-    tf2::Quaternion q(orientation_x, orientation_y, orientation_z, orientation_w);
-    tf2::Matrix3x3 m(q);
-    tf2::Vector3 world_gravity_vector(0, 0, -1);
-    tf2::Vector3 projected_gravity_vector = m.inverse() * world_gravity_vector;
-
-    // If the maximum body angle is exceeded, trigger an emergency stop
-    if (-projected_gravity_vector[2] < cos(params_.max_body_angle)) {
-      estop_active_ = true;
-      RCLCPP_INFO(get_node()->get_logger(), "Emergency stop triggered");
-      return controller_interface::return_type::OK;
-    }
-
-    // Fill the observation vector
-    // Angular velocity
-    observation_[0] = (float)ang_vel_x * params_.ang_vel_scale;
-    observation_[1] = (float)ang_vel_y * params_.ang_vel_scale;
-    observation_[2] = (float)ang_vel_z * params_.ang_vel_scale;
-    // Projected gravity vector
-    observation_[3] = (float)projected_gravity_vector[0];
-    observation_[4] = (float)projected_gravity_vector[1];
-    observation_[5] = (float)projected_gravity_vector[2];
-    // Commands
-    observation_[6] = (float)cmd_x_vel_ * params_.lin_vel_scale;
-    observation_[7] = (float)cmd_y_vel_ * params_.lin_vel_scale;
-    observation_[8] = (float)cmd_yaw_vel_ * params_.ang_vel_scale;
-    // Joint positions
-    for (int i = 0; i < ACTION_SIZE; i++) {
-      // Only include the joint position in the observation if the action type
-      // is position
-      if (params_.action_types[i] == "position") {
-        observation_[9 + i] =
-            (state_interfaces_map_.at(params_.joint_names[i]).at("position").get().get_value() -
-             params_.default_joint_pos[i]) *
-            params_.joint_pos_scale;
-      }
-    }
-  } catch (const std::out_of_range &e) {
-    RCLCPP_INFO(get_node()->get_logger(), "failed to read joint states from hardware interface");
-    return controller_interface::return_type::OK;
-  }
-
-  // Clip the observation vector
-  for (int i = 0; i < OBSERVATION_SIZE; i++) {
-    observation_[i] = std::max(std::min(observation_[i], (float)params_.observation_limit),
-                               (float)-params_.observation_limit);
-  }
-
-  // Perform policy inference
-  model_->forward(observation_);
-
-  // Shift the observation history by SINGLE_OBSERVATION_SIZE for the next control step
-  for (int i = SINGLE_OBSERVATION_SIZE; i < OBSERVATION_SIZE; i++) {
-    observation_[i] = observation_[i - SINGLE_OBSERVATION_SIZE];
-  }
-
   // Process the actions
-  const float *policy_output = model_->getOutputs();
+  std::array<float, ACTION_SIZE> policy_output = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                  0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+
+  double freq = 1.0;
+  double amp = 1.0;
+  policy_output.at(2) = std::sin(time_since_fade_in * freq * M_PI) * amp;
+
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action
     float action_clipped = std::max(std::min(policy_output[i], (float)params_.action_limit),
                                     (float)-params_.action_limit);
-    // Copy policy_output to the observation vector
-    observation_[9 + ACTION_SIZE + i] = fade_in_multiplier * action_clipped;
     // Scale and de-normalize to get the action vector
     if (params_.action_types[i] == "position") {
       action_[i] = fade_in_multiplier * action_clipped * params_.action_scales[i] +
@@ -263,16 +170,11 @@ controller_interface::return_type NeuralController::update(const rclcpp::Time &t
     command_interfaces_map_.at(params_.joint_names[i]).at("kd").get().set_value(params_.kds[i]);
   }
 
-  // Get the policy inference time
-  // double policy_inference_time = (get_node()->now() - time).seconds();
-  // RCLCPP_INFO(get_node()->get_logger(), "policy inference time: %f",
-  // policy_inference_time);
-
   return controller_interface::return_type::OK;
 }
 
-}  // namespace neural_controller
+}  // namespace real2sim_controller
 
 #include "pluginlib/class_list_macros.hpp"
-PLUGINLIB_EXPORT_CLASS(neural_controller::NeuralController,
+PLUGINLIB_EXPORT_CLASS(real2sim_controller::Real2SimController,
                        controller_interface::ControllerInterface)
