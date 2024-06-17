@@ -29,22 +29,10 @@ controller_interface::CallbackReturn Real2SimController::on_init() {
     std::cerr << "Failed to open file!" << std::endl;
     return controller_interface::CallbackReturn::ERROR;
   }
-  file_ << "time_since_fade_in (s)"
-        << ", "
-        << "phase_"
-        << ", "
-        << "amp (rad)"
-        << ", "
-        << "freq (Hz)"
-        << ", "
-        << "policy_output.at(motor_idx)"
-        << ", "
-        << "policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) (rad)"
-        << ", "
-        << "motor_position (rad)"
-        << ", "
-        << "motor_velocity (rad/s)"
-        << "\n";
+  file_ << "time_since_fade_in (s)" << ", " << "phase_" << ", " << "amp (rad)" << ", "
+        << "freq (Hz)" << ", " << "motor_idx" << ", " << "policy_output.at(motor_idx)" << ", "
+        << "policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) (rad)" << ", "
+        << "motor_position (rad)" << ", " << "motor_velocity (rad/s)" << "\n";
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -162,8 +150,8 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
       state_interfaces_map_.at(params_.joint_names.at(motor_idx)).at("velocity").get().get_value() -
       params_.default_joint_pos.at(motor_idx);
 
-  file_ << time_since_fade_in << ", " << phase_ << ", " << amp << ", " << freq << ", "
-        << policy_output.at(motor_idx) << ", "
+  file_ << time_since_fade_in << ", " << phase_ << ", " << amp << ", " << freq << ", " << motor_idx
+        << ", " << policy_output.at(motor_idx) << ", "
         << policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) << ", "
         << motor_position << ", " << motor_velocity << "\n";
 
