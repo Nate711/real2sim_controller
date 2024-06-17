@@ -2,7 +2,9 @@
 #define real2sim_controller__real2sim_controller_HPP_
 
 #include <array>
+#include <fstream>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -59,6 +61,9 @@ class Real2SimController : public controller_interface::ControllerInterface {
   Params params_;
 
   double phase_ = 0.0;
+
+  // File to write data to
+  std::ofstream file_;
 
   // Map from joint names to command types to command interfaces
   std::map<

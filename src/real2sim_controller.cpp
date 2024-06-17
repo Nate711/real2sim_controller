@@ -24,6 +24,28 @@ controller_interface::CallbackReturn Real2SimController::on_init() {
     return controller_interface::CallbackReturn::ERROR;
   }
 
+  file_.open(params_.save_filename);
+  if (!file_.is_open()) {
+    std::cerr << "Failed to open file!" << std::endl;
+    return controller_interface::CallbackReturn::ERROR;
+  }
+  file_ << "time_since_fade_in (s)"
+        << ", "
+        << "phase_"
+        << ", "
+        << "amp (rad)"
+        << ", "
+        << "freq (Hz)"
+        << ", "
+        << "policy_output.at(motor_idx)"
+        << ", "
+        << "policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) (rad)"
+        << ", "
+        << "motor_position (rad)"
+        << ", "
+        << "motor_velocity (rad/s)"
+        << "\n";
+
   return controller_interface::CallbackReturn::SUCCESS;
 }
 
@@ -128,10 +150,22 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
   std::array<float, ACTION_SIZE> policy_output = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   phase_ += freq * 2 * M_PI * period.seconds();
-  policy_output.at(2) = std::sin(phase_) * amp;
+  policy_output.at(motor_idx) = std::sin(phase_) * amp;
 
-  std::cout << "time: " << time_since_fade_in << " phase: " << phase_ << " amp: " << amp
-            << " freq: " << freq << " pos_com: " << policy_output.at(2) << "\n";
+  // std::cout << "time: " << time_since_fade_in << " phase: " << phase_ << " amp: " << amp
+  //           << " freq: " << freq << " pos_com: " << policy_output.at(2) << "\n";
+
+  double motor_position =
+      state_interfaces_map_.at(params_.joint_names.at(motor_idx)).at("position").get().get_value() -
+      params_.default_joint_pos.at(motor_idx);
+  double motor_velocity =
+      state_interfaces_map_.at(params_.joint_names.at(motor_idx)).at("velocity").get().get_value() -
+      params_.default_joint_pos.at(motor_idx);
+
+  file_ << time_since_fade_in << ", " << phase_ << ", " << amp << ", " << freq << ", "
+        << policy_output.at(motor_idx) << ", "
+        << policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) << ", "
+        << motor_position << ", " << motor_velocity << "\n";
 
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action

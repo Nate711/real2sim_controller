@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 500 # Hz
+    update_rate: 250 # Hz
 
     real2sim_controller:
       type: real2sim_controller/Real2SimController
@@ -10,6 +10,7 @@ controller_manager:
 
 real2sim_controller:
   ros__parameters:
+    test_amplitude: 0.0
     joint_names:
       [
         "leg_front_r_1",
@@ -85,5 +86,5 @@ joy_node:
 
 joint_state_broadcaster:
   ros__parameters:
-    update_rate: 200
+    update_rate: 250
     use_local_topics: false

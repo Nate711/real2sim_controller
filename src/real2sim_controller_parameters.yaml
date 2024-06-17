@@ -55,13 +55,6 @@ real2sim_controller:
       description: "Time to gradually fade in the policy actions on startup",
     }
 
-  lin_vel_scale:
-    {
-      type: double,
-      default_value: 1.0,
-      description: "Scaling factor for the linear velocity commands",
-    }
-
   action_scales:
     {
       type: double_array,
@@ -102,4 +95,11 @@ real2sim_controller:
       type: int,
       default_value: 2,
       description: "Index of motor to use for test",
+    }
+
+  save_filename:
+    {
+      type: string,
+      default_value: "real2sim_controller_data.csv",
+      description: "Name of file to which to write data",
     }
