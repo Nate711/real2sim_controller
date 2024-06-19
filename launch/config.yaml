@@ -12,10 +12,11 @@ real2sim_controller:
   ros__parameters:
     test_amplitude: 0.5
     test_frequency: 1.0
-    test_motor_index: 2
+    test_motor_index: 0
     do_sweep: true
     sweep_min_frequency: 1.0
     sweep_max_frequency: 20.0
+    sweep_secs_per_frequency: 1.0
 
     joint_names:
       [
@@ -35,7 +36,7 @@ real2sim_controller:
 
     default_joint_pos:
       [0.0, 0.0, 0.0, 0.0, -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.0, 0.0]
-    kps: [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
+    kps: [7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5, 7.5]
     kds:
       [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25]
 
