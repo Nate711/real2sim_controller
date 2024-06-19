@@ -144,36 +144,66 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
   }
 
   params_ = param_listener_->get_params();
-  double freq = params_.test_frequency;
-  double amp = params_.test_amplitude;
   int motor_idx = params_.test_motor_index;
 
   // Process the actions
   std::array<float, ACTION_SIZE> policy_output = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                                   0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 
+  // --------------------------- CUSTOM CODE     ----------------------------------------------- //
+
   double actual_period = time_since_fade_in - last_time_since_fade_in_;
   last_time_since_fade_in_ = time_since_fade_in;
-  phase_ += freq * 2 * M_PI * actual_period;
-
-  policy_output.at(motor_idx) = std::sin(phase_) * amp;
-
-  // std::cout << "time: " << time_since_fade_in << " phase: " << phase_ << " amp: " << amp
-  //           << " freq: " << freq << " pos_com: " << policy_output.at(2) << "\n";
-  std::cout << time_since_fade_in << " " << period.seconds() << " " << actual_period << " "
-            << phase_ << "\n";
 
   double motor_position =
       state_interfaces_map_.at(params_.joint_names.at(motor_idx)).at("position").get().get_value() -
       params_.default_joint_pos.at(motor_idx);
   double motor_velocity =
-      state_interfaces_map_.at(params_.joint_names.at(motor_idx)).at("velocity").get().get_value() -
-      params_.default_joint_pos.at(motor_idx);
+      state_interfaces_map_.at(params_.joint_names.at(motor_idx)).at("velocity").get().get_value();
 
-  file_ << time_since_fade_in << ", " << phase_ << ", " << amp << ", " << freq << ", " << motor_idx
-        << ", " << policy_output.at(motor_idx) << ", "
-        << policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) << ", "
-        << motor_position << ", " << motor_velocity << "\n";
+  if (params_.do_sweep) {
+    // Frequency sweep mode
+    // override fade in multiplier
+
+    fade_in_multiplier = 1.0;
+    int freq_idx = (int)(time_since_fade_in / params_.sweep_secs_per_frequency);
+    double freq = params_.sweep_min_frequency + freq_idx * params_.sweep_frequency_step;
+
+    // Stop the sweep once we go past the max frequency
+    if (freq > params_.sweep_max_frequency + 1e-6) {
+      freq = 0.0;
+    }
+
+    // phase_ += freq * 2 * M_PI * actual_period;
+
+    // If all frequencies are integer than this will give smooth motion!
+    phase_ = time_since_fade_in * 2 * M_PI * freq;
+    double position_command = std::sin(phase_) * params_.test_amplitude;
+    policy_output.at(motor_idx) = position_command;
+
+    // Save data to file
+    file_ << time_since_fade_in << "," << phase_ << "," << params_.test_amplitude << "," << freq
+          << "," << motor_idx << "," << position_command << ","
+          << position_command * params_.action_scales.at(motor_idx) << "," << motor_position << ","
+          << motor_velocity << "\n";
+
+    std::cout << time_since_fade_in << " " << period.seconds() << " " << actual_period << " "
+              << freq << " " << phase_ << " " << position_command << "\n";
+  } else {
+    // Constant frequency mode
+    phase_ += params_.test_frequency * 2 * M_PI * actual_period;
+    policy_output.at(motor_idx) = std::sin(phase_) * params_.test_amplitude;
+
+    // Save data to file
+    file_ << time_since_fade_in << ", " << phase_ << ", " << params_.test_amplitude << ", "
+          << params_.test_frequency << ", " << motor_idx << ", " << policy_output.at(motor_idx)
+          << ", " << policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) << ", "
+          << motor_position << ", " << motor_velocity << "\n";
+  }
+
+  // ------------------------------------------------------------------------------------------- //
+
+  // std::cout << time_since_fade_in << " " << period.seconds() << " " << actual_period << "\n";
 
   for (int i = 0; i < ACTION_SIZE; i++) {
     // Clip the action

@@ -97,6 +97,29 @@ real2sim_controller:
       description: "Index of motor to use for test",
     }
 
+  do_sweep:
+    {
+      type: bool,
+      default_value: false,
+      description: "whether to do frequency sweep",
+    }
+
+  sweep_min_frequency:
+    { type: double, default_value: 1.0, description: "Min frequency in Hz" }
+
+  sweep_max_frequency:
+    { type: double, default_value: 20.0, description: "Max frequency in Hz" }
+
+  sweep_frequency_step:
+    { type: int, default_value: 1, description: "Frequency step in Hz" }
+
+  sweep_secs_per_frequency:
+    {
+      type: double,
+      default_value: 1.0,
+      description: "Seconds at each frequency",
+    }
+
   save_filename:
     {
       type: string,

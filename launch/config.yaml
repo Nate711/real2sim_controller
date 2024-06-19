@@ -10,7 +10,12 @@ controller_manager:
 
 real2sim_controller:
   ros__parameters:
-    test_amplitude: 0.0
+    test_amplitude: 0.5
+    test_motor_index: 0
+    do_sweep: true
+    sweep_min_frequency: 1.0
+    sweep_max_frequency: 20.0
+
     joint_names:
       [
         "leg_front_r_1",
