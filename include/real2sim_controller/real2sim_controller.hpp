@@ -61,6 +61,7 @@ class Real2SimController : public controller_interface::ControllerInterface {
   Params params_;
 
   double phase_ = 0.0;
+  double last_time_since_fade_in_ = 0.0;
 
   // File to write data to
   std::ofstream file_;
