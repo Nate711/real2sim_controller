@@ -15,6 +15,13 @@
 #include "rclcpp/qos.hpp"
 
 namespace real2sim_controller {
+
+// Returns 1 for values >- 0 and -1 otherwise
+template <typename T>
+int binary_sign(T val) {
+  return static_cast<int>(val >= T(0)) * 2 - 1;
+}
+
 Real2SimController::Real2SimController() : controller_interface::ControllerInterface() {}
 
 controller_interface::CallbackReturn Real2SimController::on_init() {
@@ -26,9 +33,15 @@ controller_interface::CallbackReturn Real2SimController::on_init() {
     return controller_interface::CallbackReturn::ERROR;
   }
 
+  std::string sweep_name = params_.do_sweep ? "freq_sweep" : "constant_freq";
+  std::string sinusoid_type = params_.square_wave ? "_square" : "";
+  std::string freq_type = params_.do_sweep
+                              ? fmt::format("freq_min_{}Hz_max_{}Hz_", params_.sweep_min_frequency,
+                                            params_.sweep_max_frequency)
+                              : fmt::format("freq_{}Hz_", params_.test_frequency);
   std::string filename = fmt::format(
-      "freq_sweep_motor_{}_min_{}Hz_max_{}Hz_amp_{}rad_kp_{}_kd_{}.csv", params_.test_motor_index,
-      params_.sweep_min_frequency, params_.sweep_max_frequency, params_.test_amplitude,
+      "{}{}_motor_{}_{}amp_{}rad_kp_{}_kd_{}.csv", sweep_name, sinusoid_type,
+      params_.test_motor_index, freq_type, params_.test_amplitude,
       params_.kps.at(params_.test_motor_index), params_.kds.at(params_.test_motor_index));
 
   file_.open(filename);
@@ -36,9 +49,24 @@ controller_interface::CallbackReturn Real2SimController::on_init() {
     std::cerr << "Failed to open file!" << std::endl;
     return controller_interface::CallbackReturn::ERROR;
   }
-  file_ << "time_since_fade_in (s)" << "," << "phase_" << "," << "amp (rad)" << "," << "freq (Hz)"
-        << "," << "motor_idx" << "," << "policy_output" << "," << "command (rad)" << ","
-        << "motor_position (rad)" << "," << "motor_velocity (rad/s)" << "\n";
+  file_ << "time_since_fade_in (s)"
+        << ","
+        << "phase_"
+        << ","
+        << "amp (rad)"
+        << ","
+        << "freq (Hz)"
+        << ","
+        << "motor_idx"
+        << ","
+        << "policy_output"
+        << ","
+        << "command (rad)"
+        << ","
+        << "motor_position (rad)"
+        << ","
+        << "motor_velocity (rad/s)"
+        << "\n";
 
   return controller_interface::CallbackReturn::SUCCESS;
 }
@@ -155,9 +183,11 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
 
   if (params_.do_sweep) {
     // Frequency sweep mode
-    // override fade in multiplier
 
+    // Override fade in multiplier
     fade_in_multiplier = 1.0;
+
+    // Calculate frequency
     int freq_idx = (int)(time_since_fade_in / params_.sweep_secs_per_frequency);
     double freq = params_.sweep_min_frequency + freq_idx * params_.sweep_frequency_step;
 
@@ -171,7 +201,11 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
 
     // If all frequencies are integer than this will give smooth motion!
     phase_ = time_since_fade_in * 2 * M_PI * freq;
-    double position_command = std::sin(phase_) * params_.test_amplitude;
+    double output = std::sin(phase_);
+    if (params_.square_wave) {
+      output = binary_sign(output);
+    }
+    double position_command = output * params_.test_amplitude;
     policy_output.at(motor_idx) = position_command;
 
     // Save data to file
@@ -185,15 +219,27 @@ controller_interface::return_type Real2SimController::update(const rclcpp::Time 
     std::cout << time_since_fade_in << " " << period.seconds() << " " << actual_period << " "
               << freq << " " << phase_ << " " << position_command << "\n";
   } else {
+    // Override fade in multiplier
+    fade_in_multiplier = 1.0;
+
     // Constant frequency mode
     phase_ += params_.test_frequency * 2 * M_PI * actual_period;
-    policy_output.at(motor_idx) = std::sin(phase_) * params_.test_amplitude;
+
+    double output = std::sin(phase_);
+    if (params_.square_wave) {
+      output = binary_sign(output);
+    }
+    double position_command = output * params_.test_amplitude;
+    policy_output.at(motor_idx) = position_command;
 
     // Save data to file
     file_ << time_since_fade_in << ", " << phase_ << ", " << params_.test_amplitude << ", "
           << params_.test_frequency << ", " << motor_idx << ", " << policy_output.at(motor_idx)
           << ", " << policy_output.at(motor_idx) * params_.action_scales.at(motor_idx) << ", "
           << motor_position << ", " << motor_velocity << "\n";
+
+    std::cout << time_since_fade_in << " " << period.seconds() << " " << actual_period << " "
+              << params_.test_frequency << " " << phase_ << " " << position_command << "\n";
   }
 
   // ------------------------------------------------------------------------------------------- //

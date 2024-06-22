@@ -35,20 +35,6 @@ def generate_launch_description():
         allow_substs=True,
     )
 
-    joy_node = Node(
-        package="joy",
-        executable="joy_node",
-        parameters=[robot_controllers],
-        output="both",
-    )
-
-    teleop_twist_joy_node = Node(
-        package="teleop_twist_joy",
-        executable="teleop_node",
-        parameters=[robot_controllers],
-        output="both",
-    )
-
     control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
@@ -84,8 +70,6 @@ def generate_launch_description():
         control_node,
         robot_controller_spawner,
         joint_state_broadcaster_spawner,
-        joy_node,
-        teleop_twist_joy_node,
     ]
 
     return LaunchDescription(nodes)

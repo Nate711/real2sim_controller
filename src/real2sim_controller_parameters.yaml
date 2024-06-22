@@ -120,6 +120,13 @@ real2sim_controller:
       description: "Seconds at each frequency",
     }
 
+  square_wave:
+    {
+      type: bool,
+      default_value: false,
+      description: "Whether to use square wave rather than sinusoid",
+    }
+
   save_filename:
     {
       type: string,
