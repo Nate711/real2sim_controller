@@ -17,7 +17,7 @@ def generate_launch_description():
                 [
                     FindPackageShare("pupper_v3_description"),
                     "description",
-                    "pupper_v3_mujoco.urdf.xacro",
+                    "pupper_v3_mujoco_fixed_base.urdf.xacro",
                 ]
             ),
         ]
@@ -33,20 +33,6 @@ def generate_launch_description():
             ]
         ),
         allow_substs=True,
-    )
-
-    joy_node = Node(
-        package="joy",
-        executable="joy_node",
-        parameters=[robot_controllers],
-        output="both",
-    )
-
-    teleop_twist_joy_node = Node(
-        package="teleop_twist_joy",
-        executable="teleop_node",
-        parameters=[robot_controllers],
-        output="both",
     )
 
     control_node = Node(
@@ -84,8 +70,6 @@ def generate_launch_description():
         control_node,
         robot_controller_spawner,
         joint_state_broadcaster_spawner,
-        joy_node,
-        teleop_twist_joy_node,
     ]
 
     return LaunchDescription(nodes)
